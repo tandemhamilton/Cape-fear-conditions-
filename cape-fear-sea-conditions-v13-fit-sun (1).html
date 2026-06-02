@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cape Fear Sea Conditions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#061225;color:#fff;font-family:Arial,Helvetica,sans-serif;overflow:hidden;height:100vh}
+.header{display:flex;justify-content:space-between;align-items:center;padding:7px 14px;border-bottom:1px solid #16406e}
+h1{font-size:30px;margin:0}
+.sub{color:#1dd3ff;font-size:13px;font-weight:bold}
+.live{font-size:18px;font-weight:bold}.dot{display:inline-block;width:15px;height:15px;background:#14d85d;border-radius:50%;margin-right:8px}
+.main{display:grid;grid-template-columns:1.6fr .9fr;gap:8px;padding:8px}
+.panel{background:#081a33;border:1px solid #1d5a91;border-radius:14px;overflow:hidden;box-shadow:0 0 18px rgba(0,140,255,.18)}
+.panel-title{background:#082a57;padding:6px;text-align:center;font-weight:bold;font-size:14px}
+#map{height:395px;width:100%}
+.windArrow,.swellArrow{
+width:82px;height:27px;clip-path:polygon(0 30%,62% 30%,62% 0,100% 50%,62% 100%,62% 70%,0 70%);
+filter:drop-shadow(0 0 5px #000) drop-shadow(0 0 10px #000)
+}
+.windArrow{background:#ff9f1c}
+.swellArrow{background:#22d3ee}
+.mapBox{background:rgba(0,0,0,.86);color:white;border:1px solid #96bad4;border-radius:9px;padding:7px 9px;font-weight:bold;text-align:left;line-height:1.25;font-size:12px;min-width:105px}
+.mapBox b{color:#ff9f1c;font-size:16px}
+.mapBox .blue{color:#22d3ee;font-size:14px}
+.conditions{padding:9px}
+.status{font-size:38px;color:#16d94c;font-weight:bold}
+.check{float:right;font-size:44px;color:#16d94c}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px}
+.card{background:#06152b;border:1px solid #184a78;border-radius:8px;padding:6px;text-align:center}
+.label{font-size:11px;color:#bed3e7;font-weight:bold}
+.value{font-size:16px;font-weight:bold;margin-top:3px}
+.bottom{display:grid;grid-template-columns:1.15fr .75fr 1.1fr;gap:8px;padding:0 8px 8px;height:205px}
+.weatherGrid{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:6px}
+.bestBox{padding:7px;background:#06152b;border:1px solid #22d3ee;border-radius:9px;margin:7px;text-align:center}
+.bestTitle{font-size:12px;color:#bed3e7;font-weight:bold}
+.bestValue{font-size:16px;font-weight:900;color:#16d94c;margin-top:3px}
+.bestDetails{font-size:11px;color:#d7e8f9;margin-top:3px}
+.forecastList{padding:5px 7px 3px;display:grid;gap:2px}
+.forecastRow{display:grid;grid-template-columns:34px 22px 1fr 43px 36px;gap:4px;align-items:center;background:#06152b;border:1px solid #184a78;border-radius:7px;padding:3px 5px;font-size:10px}
+.forecastIcon{font-size:18px;text-align:center}
+.forecastDay{font-weight:bold;color:#22d3ee}
+.forecastCond{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.forecastTemp{text-align:right;font-weight:bold}
+.forecastRain{text-align:right;color:#bed3e7}
+.sunRow{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:0 7px 5px}
+.sunCard{background:#06152b;border:1px solid #184a78;border-radius:8px;padding:4px;text-align:center}
+.sunCard .label{font-size:10px}
+.sunCard .value{font-size:14px}
+.qgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:9px}
+.q{padding:12px;border-radius:9px;text-align:center;font-weight:bold;font-size:15px;color:white;text-decoration:none}
+.blueBtn{background:#075bd8}.purple{background:#8116a8}.green{background:#07862d}.orange{background:#d97706}
+.legend{position:absolute;z-index:999;background:rgba(0,0,0,.75);padding:8px 10px;border-radius:8px;border:1px solid #7baad0;color:#fff;font-weight:bold}
+.footer{display:none}
+.tideWrap{padding:8px}
+#tideChart{width:100%;height:78px;background:#06152b;border:1px solid #184a78;border-radius:9px}
+.tideInfo{display:flex;justify-content:space-between;color:#bed3e7;font-size:11px;padding:3px 2px 0}
+.tideState{font-size:15px;font-weight:900;text-align:center;margin:1px 0 3px;color:#22d3ee;letter-spacing:.5px}
+.tideTimes{display:flex;justify-content:space-between;color:#bed3e7;font-size:10px;padding:0 4px 2px}
+.tideTable{width:100%;border-collapse:collapse;margin-top:2px;font-size:10px;color:white}
+.tideTable th{color:#bed3e7;text-align:left;border-bottom:1px solid #184a78;padding:1px}
+.tideTable td{padding:1px;border-bottom:1px solid rgba(255,255,255,.08)}
+.tideHigh{color:#16d94c;font-weight:bold}
+.tideLow{color:#f59e0b;font-weight:bold}
+@media(max-width:1000px){.main,.bottom{grid-template-columns:1fr}h1{font-size:34px}.header{display:block}#map{height:420px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>⚓ Cape Fear Sea Conditions</h1>
+    <div class="sub">NOAA Station 41108 • Cape Fear Inlet</div>
+  </div>
+  <div>
+    <div id="time" style="font-size:20px;font-weight:bold"></div>
+    <div class="live"><span class="dot"></span>LIVE</div><div id="sunMini" style="font-size:12px;color:#ffd166;font-weight:bold;margin:2px 0">Sunrise -- • Sunset --</div><a href="https://www.surfchex.com/cams/oak-island-north-carolina/" target="_blank" style="color:white;background:#075bd8;padding:5px 9px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:bold">OKI Camera</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title">CAPE FEAR INLET MAP — WIND + SWELL ARROWS</div>
+    <div id="map"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">CURRENT SEA CONDITIONS</div>
+    <div class="conditions">
+      <div class="check">✓</div>
+      <div id="status" class="status">LOADING</div>
+      <div id="statusText">Getting live buoy and weather data...</div>
+      <div class="cards">
+        <div class="card"><div class="label">BUOY</div><div class="value">41108</div></div>
+        <div class="card"><div class="label">WAVE HEIGHT</div><div id="wave" class="value">--</div></div>
+        <div class="card"><div class="label">WAVE PERIOD</div><div id="period" class="value">--</div></div>
+        <div class="card"><div class="label">SWELL DIR</div><div id="swellDir" class="value">--</div></div>
+        <div class="card"><div class="label">WIND SPEED</div><div id="wind" class="value">--</div></div>
+        <div class="card"><div class="label">WIND DIR</div><div id="windDirCard" class="value">--</div></div>
+        <div class="card"><div class="label">WATER TEMP</div><div id="water" class="value">--</div></div>
+        <div class="card"><div class="label">AIR TEMP</div><div id="air" class="value">--</div></div>
+        <div class="card"><div class="label">TIDE</div><div id="tideMini" class="value">--</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom">
+  <div class="panel">
+    <div class="panel-title">4-DAY WEATHER FORECAST</div>
+    <div class="forecastList" id="forecastList">
+      <div class="forecastRow"><span class="forecastDay">--</span><span class="forecastIcon">⏳</span><span class="forecastCond">Loading forecast...</span><span class="forecastTemp">--</span><span class="forecastRain">--</span></div>
+    </div>
+    <div class="sunRow">
+      <div class="sunCard"><div class="label">🌅 SUNRISE</div><div id="sunrise" class="value">--</div></div>
+      <div class="sunCard"><div class="label">🌇 SUNSET</div><div id="sunset" class="value">--</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">BEST WINDOW THIS WEEK</div>
+    <div class="bestBox">
+      <div class="bestTitle">BEST TIME TO GO</div>
+      <div id="bestDay" class="bestValue">Loading...</div>
+      <div id="bestDetails" class="bestDetails">Checking 7-day marine forecast...</div>
+    </div>
+    <div class="weatherGrid">
+      <div class="card"><div class="label">WIND</div><div id="wind2" class="value">--</div></div>
+      <div class="card"><div class="label">GUSTS</div><div id="gust" class="value">--</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">SOUTHPORT TIDE TABLE</div>
+    <div class="tideWrap">
+      <div id="tideState" class="tideState">Tide: Loading...</div>
+      <canvas id="tideChart"></canvas>
+      <div class="tideTimes">
+        <span id="tideT1">--</span><span id="tideT2">--</span><span id="tideT3">--</span><span id="tideT4">--</span>
+      </div>
+      <div class="tideInfo">
+        <span id="nextTide">Loading tide...</span>
+        <a href="https://tidesandcurrents.noaa.gov/noaatidepredictions.html?id=8659084" target="_blank" style="color:#7dd3fc">Full chart</a>
+      </div>
+      <table class="tideTable">
+        <thead><tr><th>Type</th><th>Time</th><th>Height</th></tr></thead>
+        <tbody id="tideRows"><tr><td colspan="3">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Conditions are tuned for a Sea Hunt RZR 24: GOOD is comfortable, CHOPPY means use judgment, ROUGH means stay in or use extreme caution.</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map;
+
+function updateClock(){
+  const now = new Date();
+  document.getElementById("time").textContent = now.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+}
+updateClock(); setInterval(updateClock, 1000);
+
+function compassDir(deg){
+  if(deg === null || deg === undefined || isNaN(deg)) return "--";
+  const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  return dirs[Math.round(deg/22.5)%16];
+}
+
+function weatherCodeText(code){
+  const map = {0:"Clear",1:"Mainly Clear",2:"Partly Cloudy",3:"Overcast",45:"Fog",48:"Fog",51:"Light Drizzle",53:"Drizzle",55:"Heavy Drizzle",61:"Light Rain",63:"Rain",65:"Heavy Rain",80:"Rain Showers",81:"Rain Showers",82:"Heavy Showers",95:"Thunderstorm",96:"Storm",99:"Severe Storm"};
+  return map[code] || "Weather";
+}
+
+function weatherIcon(code){
+  if(code === 0) return "☀️";
+  if(code === 1) return "🌤️";
+  if(code === 2) return "⛅";
+  if(code === 3) return "☁️";
+  if(code === 45 || code === 48) return "🌫️";
+  if(code >= 51 && code <= 65) return "🌧️";
+  if(code >= 71 && code <= 75) return "❄️";
+  if(code >= 80 && code <= 82) return "🌦️";
+  if(code >= 95) return "⛈️";
+  return "🌡️";
+}
+
+function formatSunTime(iso){
+  return new Date(iso).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+}
+
+function setupMap(){
+  map = L.map('map', { zoomControl:true }).setView([33.875, -78.02], 12);
+
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri'
+  }).addTo(map);
+
+  L.marker([33.72, -78.01]).addTo(map).bindPopup("NOAA Station 41108 area");
+
+  L.marker([33.875, -78.018], {
+    icon: L.divIcon({className:'', html:'<div id="windArrow1" class="windArrow"></div>', iconSize:[90,34], iconAnchor:[45,17]})
+  }).addTo(map);
+
+  L.marker([33.855, -77.985], {
+    icon: L.divIcon({className:'', html:'<div id="windArrow2" class="windArrow"></div>', iconSize:[90,34], iconAnchor:[45,17]})
+  }).addTo(map);
+
+  L.marker([33.89, -78.055], {
+    icon: L.divIcon({className:'', html:'<div id="swellArrow1" class="swellArrow"></div>', iconSize:[90,34], iconAnchor:[45,17]})
+  }).addTo(map);
+
+  L.marker([33.84, -77.955], {
+    icon: L.divIcon({className:'', html:'<div id="swellArrow2" class="swellArrow"></div>', iconSize:[90,34], iconAnchor:[45,17]})
+  }).addTo(map);
+
+  L.marker([33.925, -77.99], {
+    icon: L.divIcon({
+      className:'',
+      html:'<div class="mapBox">WIND<br><b id="mapWindDir">--</b><br><span id="mapWindSpeed">--</span><hr style="border:.5px solid #476b87">SWELL<br><span class="blue" id="mapSwellDir">--</span></div>',
+      iconSize:[120,105],
+      iconAnchor:[60,52]
+    })
+  }).addTo(map);
+}
+
+async function loadData(){
+  try{
+    // Station 41108 area. Marine API does not use exact NOAA station ID, so this pulls closest gridded marine data near 41108.
+    const lat = 33.72, lon = -78.01;
+    const weatherLat = 33.91, weatherLon = -78.02;
+
+    const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_period,wave_direction,sea_surface_temperature`;
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${weatherLat}&longitude=${weatherLon}&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m,weather_code,cloud_cover&daily=sunrise,sunset&wind_speed_unit=mph&temperature_unit=fahrenheit&timezone=America/New_York`;
+
+    const [mRes,wRes] = await Promise.all([fetch(marineUrl), fetch(weatherUrl)]);
+    const marine = await mRes.json();
+    const weather = await wRes.json();
+
+    const waveFt = marine.current.wave_height * 3.28084;
+    const period = marine.current.wave_period;
+    const swellDeg = marine.current.wave_direction;
+    const waterF = marine.current.sea_surface_temperature * 9/5 + 32;
+
+    const wind = weather.current.wind_speed_10m;
+    const gust = weather.current.wind_gusts_10m;
+    const windDeg = weather.current.wind_direction_10m;
+    const air = weather.current.temperature_2m;
+
+    const windDir = compassDir(windDeg);
+    const swellDir = compassDir(swellDeg);
+
+    document.getElementById("wave").textContent = waveFt.toFixed(1) + " ft";
+    document.getElementById("period").textContent = period.toFixed(0) + " sec";
+    document.getElementById("swellDir").textContent = swellDir + " " + Math.round(swellDeg) + "°";
+    if(document.getElementById("swellDir2")) document.getElementById("swellDir2").textContent = swellDir + " " + Math.round(swellDeg) + "°";
+    document.getElementById("water").textContent = waterF.toFixed(0) + "°F";
+
+    document.getElementById("wind").textContent = wind.toFixed(0) + " mph";
+    document.getElementById("wind2").textContent = wind.toFixed(0) + " mph";
+    document.getElementById("gust").textContent = gust.toFixed(0) + " mph";
+    document.getElementById("air").textContent = air.toFixed(0) + "°F";
+    document.getElementById("windDirCard").textContent = windDir + " " + Math.round(windDeg) + "°";
+    if(document.getElementById("windDir2")) document.getElementById("windDir2").textContent = windDir + " " + Math.round(windDeg) + "°";
+
+    if(document.getElementById("weatherText")) document.getElementById("weatherText").textContent = weatherCodeText(weather.current.weather_code);
+    if(document.getElementById("cloud")) document.getElementById("cloud").textContent = weather.current.cloud_cover + "%";
+    document.getElementById("sunrise").textContent = formatSunTime(weather.daily.sunrise[0]);
+    document.getElementById("sunset").textContent = formatSunTime(weather.daily.sunset[0]);
+
+    document.getElementById("mapWindDir").textContent = windDir + " " + Math.round(windDeg) + "°";
+    document.getElementById("mapWindSpeed").textContent = wind.toFixed(0) + " mph";
+    document.getElementById("mapSwellDir").textContent = swellDir + " " + Math.round(swellDeg) + "°";
+
+    // Meteorological wind and wave directions indicate where they come FROM.
+    // Add 180 degrees so arrows show where they are moving TO.
+    const windFlow = windDeg + 180;
+    const swellFlow = swellDeg + 180;
+
+    document.getElementById("windArrow1").style.transform = `rotate(${windFlow}deg)`;
+    document.getElementById("windArrow2").style.transform = `rotate(${windFlow}deg)`;
+    document.getElementById("swellArrow1").style.transform = `rotate(${swellFlow}deg)`;
+    document.getElementById("swellArrow2").style.transform = `rotate(${swellFlow}deg)`;
+
+    let status = "CHOPPY", color = "#f59e0b", text = "Sea Hunt RZR 24: choppy. Use judgment.";
+    // Tuned for a 24' Sea Hunt RZR bay boat.
+    // GOOD = comfortable bay-boat conditions. CHOPPY = doable but not ideal. ROUGH = inlet/offshore caution.
+    if(period >= 8 && waveFt <= 2.0 && wind <= 12 && gust <= 18){
+      status="GOOD"; color="#16d94c"; text="Sea Hunt RZR 24: good/comfortable.";
+    }
+    if(period < 6 || waveFt >= 3.5 || wind >= 18 || gust >= 22){
+      status="ROUGH"; color="#ef4444"; text="Sea Hunt RZR 24: rough. Use extreme caution.";
+    }
+
+    document.getElementById("status").textContent = status;
+    document.getElementById("status").style.color = color;
+    document.querySelector(".check").style.color = color;
+    document.getElementById("statusText").textContent = text;
+
+  }catch(e){
+    console.log(e);
+    document.getElementById("status").textContent = "MAP LOADED";
+    document.getElementById("statusText").textContent = "Map loaded. Live data could not refresh.";
+  }
+}
+
+
+async function loadTides(){
+  try{
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const startDate = new Date(now.getTime() - 18*60*60*1000);
+    const begin = `${startDate.getFullYear()}${pad(startDate.getMonth()+1)}${pad(startDate.getDate())}`;
+    const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date=${begin}&range=48&station=8659084&product=predictions&datum=MLLW&time_zone=lst_ldt&units=english&interval=hilo&format=json`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const pts = data.predictions || [];
+    if(!pts.length) throw new Error("No tide data");
+
+    const tidePts = pts.map(p => ({t:new Date(p.t), v:parseFloat(p.v), type:p.type}));
+
+    // Find previous and next tide points relative to now.
+    let prev = null, next = null;
+    for(let i=0;i<tidePts.length-1;i++){
+      if(tidePts[i].t <= now && tidePts[i+1].t >= now){
+        prev = tidePts[i];
+        next = tidePts[i+1];
+        break;
+      }
+    }
+    if(!prev || !next){
+      prev = tidePts[0];
+      next = tidePts[1] || tidePts[0];
+    }
+
+    const tideRising = next.v > prev.v;
+    const tideWord = tideRising ? "RISING" : "FALLING";
+    const nextType = next.type === "H" ? "HIGH" : "LOW";
+
+    document.getElementById("tideState").textContent =
+      `TIDE ${tideWord} → ${nextType}`;
+    document.getElementById("tideState").style.color = tideRising ? "#16d94c" : "#f59e0b";
+    const mini = document.getElementById("tideMini");
+    if(mini){
+      mini.textContent = tideWord;
+      mini.style.color = tideRising ? "#16d94c" : "#f59e0b";
+    }
+
+    // Tide table: show previous, next, and upcoming so you can see the cycle.
+    const prevIndex = tidePts.findIndex(p => p.t.getTime() === prev.t.getTime());
+    const tablePts = tidePts.slice(Math.max(0, prevIndex), Math.max(0, prevIndex) + 4);
+    const rows = tablePts.map(p=>{
+      const time = p.t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+      const type = p.type === "H" ? "High" : "Low";
+      const cls = p.type === "H" ? "tideHigh" : "tideLow";
+      return `<tr><td class="${cls}">${type}</td><td>${time}</td><td>${p.v.toFixed(1)} ft</td></tr>`;
+    }).join("");
+    document.getElementById("tideRows").innerHTML = rows;
+
+    // Time blocks under chart
+    ["tideT1","tideT2","tideT3","tideT4"].forEach((id,i)=>{
+      document.getElementById(id).textContent = tablePts[i] ? tablePts[i].t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) : "--";
+    });
+
+    const canvas = document.getElementById("tideChart");
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr,dpr);
+    const w = rect.width, h = rect.height;
+    ctx.clearRect(0,0,w,h);
+
+    let chartPts = tablePts.length >= 3 ? tablePts : tidePts.slice(0,5);
+    const vals = chartPts.map(p => p.v);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const margin = 15;
+    const plotW = w - 2*margin;
+    const plotH = h - 2*margin;
+
+    ctx.strokeStyle = "#184a78";
+    ctx.lineWidth = 1;
+    for(let i=0;i<3;i++){
+      const y = margin + i*plotH/2;
+      ctx.beginPath(); ctx.moveTo(margin,y); ctx.lineTo(w-margin,y); ctx.stroke();
+    }
+
+    function yFromVal(v){
+      return h-margin - ((v-min)/(max-min || 1))*plotH;
+    }
+
+    const smooth = [];
+    for(let i=0;i<chartPts.length-1;i++){
+      const a = chartPts[i], b = chartPts[i+1];
+      const steps = 35;
+      for(let s=0;s<steps;s++){
+        const u = s/steps;
+        const eased = (1 - Math.cos(Math.PI*u)) / 2;
+        smooth.push({idx:i+u, v:a.v + (b.v-a.v)*eased});
+      }
+    }
+    smooth.push({idx:chartPts.length-1, v:chartPts[chartPts.length-1].v});
+
+    ctx.beginPath();
+    smooth.forEach((p,i)=>{
+      const x = margin + (p.idx/(chartPts.length-1 || 1))*plotW;
+      const y = yFromVal(p.v);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.lineTo(w-margin, h-margin);
+    ctx.lineTo(margin, h-margin);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, margin, 0, h-margin);
+    grad.addColorStop(0, "rgba(34,211,238,.35)");
+    grad.addColorStop(1, "rgba(34,211,238,.04)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    smooth.forEach((p,i)=>{
+      const x = margin + (p.idx/(chartPts.length-1 || 1))*plotW;
+      const y = yFromVal(p.v);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle = "#22d3ee";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Actual NOW line and dot
+    const prevChartIndex = chartPts.findIndex(p => p.t.getTime() === prev.t.getTime());
+    const nextChartIndex = chartPts.findIndex(p => p.t.getTime() === next.t.getTime());
+    let nowRatio = 0;
+    if(next.t > prev.t) nowRatio = (now - prev.t) / (next.t - prev.t);
+    nowRatio = Math.max(0, Math.min(1, nowRatio));
+    const nowIndex = (prevChartIndex >= 0 && nextChartIndex >= 0) ? prevChartIndex + (nextChartIndex - prevChartIndex)*nowRatio : 0;
+    const easedNow = (1 - Math.cos(Math.PI*nowRatio)) / 2;
+    const nowV = prev.v + (next.v - prev.v)*easedNow;
+    const nowX = margin + (nowIndex/(chartPts.length-1 || 1))*plotW;
+    const nowY = yFromVal(nowV);
+
+    ctx.strokeStyle = "#ef4444";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5,4]);
+    ctx.beginPath();
+    ctx.moveTo(nowX, margin);
+    ctx.lineTo(nowX, h - margin);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "#ef4444";
+    ctx.font = "bold 10px Arial";
+    ctx.fillText("NOW", Math.max(2, nowX - 12), margin - 2);
+    ctx.beginPath(); ctx.arc(nowX, nowY, 5, 0, Math.PI*2); ctx.fill();
+
+    chartPts.forEach((p,i)=>{
+      const x = margin + i*plotW/(chartPts.length-1 || 1);
+      const y = yFromVal(p.v);
+      ctx.fillStyle = p.type === "H" ? "#16d94c" : "#f59e0b";
+      ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "10px Arial";
+      ctx.fillText(p.type, x-3, y-7);
+    });
+
+    document.getElementById("nextTide").textContent =
+      `Now ${nowV.toFixed(1)} ft • ${tideWord} to ${nextType} ${next.v.toFixed(1)} ft at ${next.t.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'})}`;
+  }catch(e){
+    console.log(e);
+    document.getElementById("nextTide").textContent = "Tide table could not load";
+    document.getElementById("tideState").textContent = "Tide: unavailable";
+    const mini = document.getElementById("tideMini");
+    if(mini) mini.textContent = "--";
+    document.getElementById("tideRows").innerHTML = "<tr><td colspan='3'>No tide data</td></tr>";
+  }
+}
+
+async function loadBestWindow(){
+  try{
+    const lat = 33.72, lon = -78.01;
+    const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,wave_period&forecast_days=7`;
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=33.91&longitude=-78.02&hourly=wind_speed_10m,wind_gusts_10m&wind_speed_unit=mph&forecast_days=7&timezone=America/New_York`;
+
+    const [mRes,wRes] = await Promise.all([fetch(marineUrl), fetch(weatherUrl)]);
+    const marine = await mRes.json();
+    const weather = await wRes.json();
+
+    let best = null;
+
+    for(let i=0; i<marine.hourly.time.length; i++){
+      const t = new Date(marine.hourly.time[i]);
+      const hour = t.getHours();
+
+      // Daylight/usable fishing windows only
+      if(hour < 6 || hour > 19) continue;
+
+      const waveFt = marine.hourly.wave_height[i] * 3.28084;
+      const period = marine.hourly.wave_period[i];
+      const wind = weather.hourly.wind_speed_10m[i];
+      const gust = weather.hourly.wind_gusts_10m[i];
+
+      // Sea Hunt RZR 24 scoring: lower waves/wind, longer period wins.
+      let score = 100;
+      score -= waveFt * 18;
+      score += Math.min(period, 12) * 4;
+      score -= wind * 2.2;
+      score -= gust * 1.2;
+
+      // Prefer morning windows slightly
+      if(hour >= 7 && hour <= 11) score += 8;
+
+      // Penalize rough thresholds
+      if(waveFt >= 3.5 || wind >= 18 || gust >= 22 || period < 6) score -= 50;
+
+      if(!best || score > best.score){
+        best = {score, t, waveFt, period, wind, gust};
+      }
+    }
+
+    if(!best) throw new Error("No best window found");
+
+    const day = best.t.toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"});
+    const time = best.t.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+    document.getElementById("bestDay").textContent = `${day} ${time}`;
+    document.getElementById("bestDetails").textContent =
+      `${best.waveFt.toFixed(1)} ft @ ${best.period.toFixed(0)}s • wind ${best.wind.toFixed(0)} mph`;
+
+  }catch(e){
+    console.log(e);
+    document.getElementById("bestDay").textContent = "Unavailable";
+    document.getElementById("bestDetails").textContent = "Could not load weekly marine forecast.";
+  }
+}
+
+async function loadWeatherForecast(){
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=33.91&longitude=-78.02&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&temperature_unit=fahrenheit&timezone=America/New_York&forecast_days=4`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const rows = data.daily.time.map((dateStr, i) => {
+      const d = new Date(dateStr + "T12:00:00");
+      const day = d.toLocaleDateString([], {weekday:"short"});
+      const cond = weatherCodeText(data.daily.weather_code[i]);
+      const hi = Math.round(data.daily.temperature_2m_max[i]);
+      const lo = Math.round(data.daily.temperature_2m_min[i]);
+      const rain = data.daily.precipitation_probability_max[i] ?? 0;
+      return `<div class="forecastRow">
+        <span class="forecastDay">${day}</span>
+        <span class="forecastIcon">${weatherIcon(data.daily.weather_code[i])}</span>
+        <span class="forecastCond">${cond}</span>
+        <span class="forecastTemp">${hi}/${lo}°</span>
+        <span class="forecastRain">${rain}%</span>
+      </div>`;
+    }).join("");
+
+    document.getElementById("forecastList").innerHTML = rows;
+
+    // Keep sunrise/sunset for today
+    document.getElementById("sunrise").textContent = formatSunTime(data.daily.sunrise[0]);
+    document.getElementById("sunset").textContent = formatSunTime(data.daily.sunset[0]);
+    const sm = document.getElementById("sunMini");
+    if(sm) sm.textContent = `Sunrise ${formatSunTime(data.daily.sunrise[0])} • Sunset ${formatSunTime(data.daily.sunset[0])}`;
+  }catch(e){
+    console.log(e);
+    document.getElementById("forecastList").innerHTML =
+      `<div class="forecastRow"><span class="forecastDay">--</span><span class="forecastIcon">⚠️</span><span class="forecastCond">Forecast unavailable</span><span class="forecastTemp">--</span><span class="forecastRain">--</span></div>`;
+  }
+}
+
+setupMap();
+loadData();
+loadTides();
+loadBestWindow();
+loadWeatherForecast();
+setInterval(loadData, 600000);
+setInterval(loadTides, 1800000);
+setInterval(loadBestWindow, 1800000);
+setInterval(loadWeatherForecast, 1800000);
+</script>
+</body>
+</html>
